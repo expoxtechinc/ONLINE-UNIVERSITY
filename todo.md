@@ -32,3 +32,5 @@
 - [x] Replace the invalid Vercel `functions` pattern with a supported API entrypoint and verify the Vercel build.
 - [x] Validate certificate PDF generation and QR verification URL generation locally.
 - [x] Provide the required Vercel environment-variable checklist and connection instructions.
+- [ ] Diagnose the persisting Vercel failure after the API entrypoint fix and implement a Vite-compatible deployment build if required.
+- [ ] Diagnose and fix the deployment error contained in pasted_content_3.txt, then push the targeted correction.
