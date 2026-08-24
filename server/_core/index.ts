@@ -31,9 +31,8 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 
-export async function startServer() {
+export async function createApp() {
   const app = express();
-  const server = createServer(app);
 
   // Permit same-origin requests by default. Cross-origin credentialed requests must be allowlisted.
   app.use((req, res, next) => {
@@ -87,6 +86,12 @@ export async function startServer() {
     app.get("*", (_req, res) => res.sendFile(path.join(webDist, "index.html")));
   }
 
+  return app;
+}
+
+export async function startServer() {
+  const app = await createApp();
+  const server = createServer(app);
   const preferredPort = parseInt(process.env.PORT || "3000");
   const port = await findAvailablePort(preferredPort);
 

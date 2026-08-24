@@ -4,8 +4,9 @@
   "installCommand": "pnpm install --frozen-lockfile",
   "buildCommand": "pnpm build:vercel",
   "devCommand": "pnpm dev",
+  "outputDirectory": "web-dist",
   "functions": {
-    "server.ts": {
+    "api/[...path].ts": {
       "memory": 1024,
       "maxDuration": 60
     }

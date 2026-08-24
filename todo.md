@@ -28,3 +28,7 @@
 - [x] Add server-generated downloadable certificate and official transcript documents for eligible learners.
 - [x] Add learner-facing download and transcript controls linked to their secure academic record.
 - [x] Replace oversized local certificate artwork with deployment-safe generated assets and complete final release validation.
+- [x] Diagnose and fix the reported Vercel deployment failure, then validate the repository build configuration.
+- [x] Replace the invalid Vercel `functions` pattern with a supported API entrypoint and verify the Vercel build.
+- [x] Validate certificate PDF generation and QR verification URL generation locally.
+- [x] Provide the required Vercel environment-variable checklist and connection instructions.
