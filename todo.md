@@ -22,4 +22,9 @@
 - [x] Add administrator user management, course deletion safeguards, and certificate issuance controls.
 - [x] Build an original certificate layout with the supplied signature and QR-linked public verification.
 - [x] Add Vercel configuration, environment-variable documentation, and production deployment checks.
-- [ ] Push the completed codebase and documentation to expoxtechinc/ONLINE-UNIVERSITY.
+- [x] Push the completed codebase and documentation to expoxtechinc/ONLINE-UNIVERSITY.
+- [x] Add learner legal-name and credential-profile fields for certificate generation.
+- [x] Automatically complete enrollments and issue verified certificates after passing final assessments.
+- [x] Add server-generated downloadable certificate and official transcript documents for eligible learners.
+- [x] Add learner-facing download and transcript controls linked to their secure academic record.
+- [x] Replace oversized local certificate artwork with deployment-safe generated assets and complete final release validation.

@@ -15,6 +15,20 @@
       "when": 1787571696156,
       "tag": "0001_ambitious_magik",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1787574742234,
+      "tag": "0002_wild_chamber",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1787574784517,
+      "tag": "0003_numerous_moon_knight",
+      "breakpoints": true
     }
   ]
 }

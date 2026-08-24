@@ -2,6 +2,7 @@ import type { Express, Request, Response } from "express";
 import express from "express";
 
 import * as db from "./db";
+import { generateCertificatePdf, generateTranscriptPdf } from "./documents";
 import { createStripeCheckoutSession, verifyStripeSignature } from "./stripe";
 import { storagePut } from "./storage";
 import { normalizeUsername, verifySecret } from "./security";
@@ -165,5 +166,50 @@ export function registerPlatformRoutes(app: Express) {
     if (!record || record.certificate.revokedAt) { res.status(404).json({ valid: false }); return; }
     res.setHeader("Cache-Control", "public, max-age=300");
     res.json({ valid: true, verificationCode: record.certificate.verificationCode, learnerName: record.learnerName, courseName: record.courseTitle, finalScore: record.certificate.finalScore, issuedAt: record.certificate.issuedAt });
+  });
+
+  app.put("/api/learner/profile", async (req, res) => {
+    try {
+      const user = await sdk.authenticateRequest(req);
+      const profile = await db.updateCredentialProfile(user.id, { legalName: String(req.body?.legalName || ""), country: typeof req.body?.country === "string" ? req.body.country : undefined });
+      res.json({ id: profile?.id, legalName: profile?.legalName, country: profile?.country });
+    } catch (error) { res.status(400).json({ error: error instanceof Error ? error.message : "Profile update failed" }); }
+  });
+
+  app.post("/api/learning/lessons/:lessonId/complete", async (req, res) => {
+    try {
+      const user = await sdk.authenticateRequest(req);
+      res.json(await db.completeLessonForLearner({ studentId: user.id, lessonId: Number(req.params.lessonId) }));
+    } catch (error) { res.status(400).json({ error: error instanceof Error ? error.message : "Lesson completion failed" }); }
+  });
+
+  app.post("/api/learning/final-assessments/:lessonId/submit", async (req, res) => {
+    try {
+      const user = await sdk.authenticateRequest(req);
+      const answers = typeof req.body?.answers === "object" && req.body.answers ? req.body.answers : {};
+      res.json(await db.submitFinalAssessment({ studentId: user.id, lessonId: Number(req.params.lessonId), answers }));
+    } catch (error) { res.status(400).json({ error: error instanceof Error ? error.message : "Assessment submission failed" }); }
+  });
+
+  app.get("/api/learner/certificates/:verificationCode/download", async (req, res) => {
+    try {
+      const user = await sdk.authenticateRequest(req);
+      const record = await db.getCertificateForLearner(user.id, req.params.verificationCode.toUpperCase());
+      if (!record || record.certificate.revokedAt) { res.status(404).json({ error: "Certificate not found" }); return; }
+      const learner = await db.getUserById(user.id);
+      const file = await generateCertificatePdf({ learnerName: learner?.legalName || learner?.name || record.learnerName || "Learner", courseName: record.courseTitle, issuedAt: record.certificate.issuedAt, finalScore: record.certificate.finalScore, verificationCode: record.certificate.verificationCode, verificationUrl: `${safeAppUrl(req)}/verify/${record.certificate.verificationCode}` });
+      res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${record.certificate.verificationCode}-certificate.pdf"`, "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" });
+      res.send(file);
+    } catch { res.status(401).json({ error: "Authentication is required to download a certificate" }); }
+  });
+
+  app.get("/api/learner/transcript/download", async (req, res) => {
+    try {
+      const user = await sdk.authenticateRequest(req);
+      const transcript = await db.getLearnerTranscript(user.id);
+      const file = await generateTranscriptPdf({ learnerName: transcript.learner.legalName || transcript.learner.name || "Learner", learnerEmail: transcript.learner.email, createdAt: new Date(), entries: transcript.entries.map(({ course, enrollment, certificate }) => ({ title: course.title, category: course.category, level: course.level, durationMinutes: course.durationMinutes, status: enrollment.status, progressPercent: enrollment.progressPercent, finalScore: certificate?.finalScore ?? null, issuedAt: certificate?.issuedAt ?? null })) });
+      res.set({ "Content-Type": "application/pdf", "Content-Disposition": "attachment; filename=online-university-transcript.pdf", "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" });
+      res.send(file);
+    } catch { res.status(401).json({ error: "Authentication is required to download a transcript" }); }
   });
 }

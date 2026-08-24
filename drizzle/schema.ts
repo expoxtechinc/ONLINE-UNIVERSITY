@@ -15,6 +15,8 @@ export const users = mysqlTable("users", {
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
+  legalName: varchar("legalName", { length: 255 }),
+  country: varchar("country", { length: 120 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "student", "instructor", "admin"]).default("student").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -123,6 +125,22 @@ export const certificates = mysqlTable("certificates", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => [uniqueIndex("certificates_verification_unique").on(table.verificationCode), uniqueIndex("certificates_student_course_unique").on(table.studentId, table.courseId)]);
 
+export const assessmentAttempts = mysqlTable("assessment_attempts", {
+  id: int("id").autoincrement().primaryKey(),
+  studentId: int("studentId").notNull(),
+  lessonId: int("lessonId").notNull(),
+  score: int("score").notNull(),
+  passed: mysqlEnum("passed", ["yes", "no"]).notNull(),
+  submittedAt: timestamp("submittedAt").defaultNow().notNull(),
+}, (table) => [index("assessment_attempts_student_lesson_idx").on(table.studentId, table.lessonId)]);
+
+export const lessonCompletions = mysqlTable("lesson_completions", {
+  id: int("id").autoincrement().primaryKey(),
+  studentId: int("studentId").notNull(),
+  lessonId: int("lessonId").notNull(),
+  completedAt: timestamp("completedAt").defaultNow().notNull(),
+}, (table) => [uniqueIndex("lesson_completions_student_lesson_unique").on(table.studentId, table.lessonId), index("lesson_completions_student_idx").on(table.studentId)]);
+
 export const paymentEvents = mysqlTable("payment_events", {
   id: int("id").autoincrement().primaryKey(),
   stripeEventId: varchar("stripeEventId", { length: 255 }).notNull(),
@@ -138,3 +156,5 @@ export type CourseModule = typeof courseModules.$inferSelect;
 export type Lesson = typeof lessons.$inferSelect;
 export type Enrollment = typeof enrollments.$inferSelect;
 export type Certificate = typeof certificates.$inferSelect;
+export type AssessmentAttempt = typeof assessmentAttempts.$inferSelect;
+export type LessonCompletion = typeof lessonCompletions.$inferSelect;

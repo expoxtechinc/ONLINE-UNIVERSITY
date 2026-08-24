@@ -1,4 +1,6 @@
 import { Platform } from "react-native";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
 
 import { getApiBaseUrl } from "@/constants/oauth";
 import * as Auth from "@/lib/_core/auth";
@@ -41,4 +43,35 @@ export async function uploadCourseAsset(input: { courseId: number; uri: string; 
 
 export async function startCourseCheckout(courseId: number) {
   return request<{ checkoutUrl?: string; checkoutSessionId?: string; alreadyEnrolled?: boolean }>("/api/payments/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ courseId }) });
+}
+
+export async function updateCredentialProfile(input: { legalName: string; country?: string }) {
+  return request<{ id: number; legalName: string; country: string | null }>("/api/learner/profile", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
+}
+
+async function downloadProtectedPdf(path: string, filename: string) {
+  const authorization = await Auth.getSessionToken();
+  if (Platform.OS === "web") {
+    const response = await fetch(endpoint(path), { credentials: "include", headers: await headers() });
+    if (!response.ok) { const body = await response.json().catch(() => ({})); throw new Error((body as { error?: string }).error || "Document download failed"); }
+    const url = URL.createObjectURL(await response.blob());
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return;
+  }
+  const destination = `${FileSystem.cacheDirectory}${filename}`;
+  const result = await FileSystem.downloadAsync(endpoint(path), destination, { headers: authorization ? { Authorization: `Bearer ${authorization}` } : {} });
+  if (!(await Sharing.isAvailableAsync())) throw new Error("File sharing is not available on this device.");
+  await Sharing.shareAsync(result.uri, { mimeType: "application/pdf", dialogTitle: filename });
+}
+
+export function downloadCertificate(verificationCode: string) {
+  return downloadProtectedPdf(`/api/learner/certificates/${encodeURIComponent(verificationCode)}/download`, `${verificationCode}-certificate.pdf`);
+}
+
+export function downloadTranscript() {
+  return downloadProtectedPdf("/api/learner/transcript/download", "online-university-transcript.pdf");
 }

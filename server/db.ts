@@ -1,7 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/mysql2";
-import { accountCredentials, certificates, courseAssets, courseModules, courses, enrollments, lessons, paymentEvents, type InsertUser, users } from "../drizzle/schema";
+import { accountCredentials, assessmentAttempts, certificates, courseAssets, courseModules, courses, enrollments, lessonCompletions, lessons, paymentEvents, type InsertUser, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { hashSecret, normalizeUsername } from "./security";
 
@@ -103,6 +103,15 @@ export async function getUserById(id: number) {
   if (!db) throw new Error("Database unavailable");
   const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
   return result[0] ?? null;
+}
+
+export async function updateCredentialProfile(userId: number, input: { legalName: string; country?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const legalName = input.legalName.trim();
+  if (legalName.length < 2 || legalName.length > 255) throw new Error("Enter the full legal name to appear on credentials");
+  await db.update(users).set({ legalName, country: input.country?.trim() || null }).where(eq(users.id, userId));
+  return getUserById(userId);
 }
 
 export async function ensureBootstrapAdministrator() {
@@ -219,6 +228,19 @@ export async function getModuleById(id: number) {
   return result[0] ?? null;
 }
 
+export async function getLessonById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select({ lesson: lessons, courseId: courseModules.courseId }).from(lessons).innerJoin(courseModules, eq(lessons.moduleId, courseModules.id)).where(eq(lessons.id, id)).limit(1);
+  return result[0] ?? null;
+}
+
+export async function getCourseLessons(courseId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({ lesson: lessons, modulePosition: courseModules.position }).from(lessons).innerJoin(courseModules, eq(lessons.moduleId, courseModules.id)).where(eq(courseModules.courseId, courseId));
+}
+
 export async function createCourseAsset(input: typeof courseAssets.$inferInsert) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
@@ -238,6 +260,58 @@ export async function getEnrollment(studentId: number, courseId: number) {
   if (!db) return null;
   const result = await db.select().from(enrollments).where(and(eq(enrollments.studentId, studentId), eq(enrollments.courseId, courseId))).limit(1);
   return result[0] ?? null;
+}
+
+async function updateEnrollmentProgress(studentId: number, courseId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const courseLessonRows = await getCourseLessons(courseId);
+  const completedRows = await db.select({ lessonId: lessonCompletions.lessonId }).from(lessonCompletions).where(eq(lessonCompletions.studentId, studentId));
+  const courseLessonIds = new Set(courseLessonRows.map((item) => item.lesson.id));
+  const completedLessons = completedRows.filter((item) => courseLessonIds.has(item.lessonId)).length;
+  const progressPercent = courseLessonRows.length ? Math.round((completedLessons / courseLessonRows.length) * 100) : 0;
+  await db.update(enrollments).set({ progressPercent }).where(and(eq(enrollments.studentId, studentId), eq(enrollments.courseId, courseId)));
+  return { totalLessons: courseLessonRows.length, completedLessons, progressPercent };
+}
+
+export async function completeLessonForLearner(input: { studentId: number; lessonId: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const lessonRecord = await getLessonById(input.lessonId);
+  if (!lessonRecord) throw new Error("Lesson not found");
+  if (lessonRecord.lesson.type === "final_exam") throw new Error("Final assessments must be submitted through the assessment flow");
+  const enrollment = await getEnrollment(input.studentId, lessonRecord.courseId);
+  if (!enrollment || !["active", "completed"].includes(enrollment.status)) throw new Error("An active course enrollment is required");
+  await db.insert(lessonCompletions).values({ studentId: input.studentId, lessonId: input.lessonId, completedAt: new Date() }).onDuplicateKeyUpdate({ set: { completedAt: new Date() } });
+  return updateEnrollmentProgress(input.studentId, lessonRecord.courseId);
+}
+
+export async function submitFinalAssessment(input: { studentId: number; lessonId: number; answers: Record<string, string> }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const lessonRecord = await getLessonById(input.lessonId);
+  if (!lessonRecord || lessonRecord.lesson.type !== "final_exam") throw new Error("Final assessment not found");
+  const enrollment = await getEnrollment(input.studentId, lessonRecord.courseId);
+  if (!enrollment || enrollment.status !== "active") throw new Error("An active course enrollment is required");
+  let questions: Array<{ id: string; answer: string }> = [];
+  try {
+    const parsed = JSON.parse(lessonRecord.lesson.assessmentJson || "{}");
+    questions = Array.isArray(parsed.questions) ? parsed.questions.filter((question: unknown): question is { id: string; answer: string } => typeof (question as { id?: unknown })?.id === "string" && typeof (question as { answer?: unknown })?.answer === "string") : [];
+  } catch { throw new Error("Final assessment configuration is invalid"); }
+  if (!questions.length) throw new Error("Final assessment requires administrator-configured answer keys");
+  const correct = questions.filter((question) => input.answers[question.id] === question.answer).length;
+  const score = Math.round((correct / questions.length) * 100);
+  const passed = score >= 70;
+  await db.insert(assessmentAttempts).values({ studentId: input.studentId, lessonId: input.lessonId, score, passed: passed ? "yes" : "no" });
+  if (!passed) return { score, passed, certificate: null, progressPercent: enrollment.progressPercent };
+  await db.insert(lessonCompletions).values({ studentId: input.studentId, lessonId: input.lessonId, completedAt: new Date() }).onDuplicateKeyUpdate({ set: { completedAt: new Date() } });
+  const progress = await updateEnrollmentProgress(input.studentId, lessonRecord.courseId);
+  let certificate = null;
+  if (progress.progressPercent === 100) {
+    await db.update(enrollments).set({ status: "completed", completedAt: new Date(), progressPercent: 100 }).where(and(eq(enrollments.studentId, input.studentId), eq(enrollments.courseId, lessonRecord.courseId)));
+    certificate = await issueCertificate({ studentId: input.studentId, courseId: lessonRecord.courseId, finalScore: score });
+  }
+  return { score, passed, certificate, progressPercent: progress.progressPercent };
 }
 
 export async function createPendingEnrollment(studentId: number, courseId: number, amount: number, currency: string) {
@@ -300,4 +374,22 @@ export async function getCertificateByVerificationCode(verificationCode: string)
   if (!db) return null;
   const result = await db.select({ certificate: certificates, courseTitle: courses.title, learnerName: users.name }).from(certificates).innerJoin(courses, eq(certificates.courseId, courses.id)).innerJoin(users, eq(certificates.studentId, users.id)).where(eq(certificates.verificationCode, verificationCode)).limit(1);
   return result[0] ?? null;
+}
+
+export async function getCertificateForLearner(studentId: number, verificationCode: string) {
+  const record = await getCertificateByVerificationCode(verificationCode);
+  return record?.certificate.studentId === studentId ? record : null;
+}
+
+export async function getLearnerTranscript(studentId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const learner = await getUserById(studentId);
+  if (!learner) throw new Error("Learner not found");
+  const records = await db.select({ enrollment: enrollments, course: courses }).from(enrollments).innerJoin(courses, eq(enrollments.courseId, courses.id)).where(eq(enrollments.studentId, studentId));
+  const entries = await Promise.all(records.map(async ({ enrollment, course }) => {
+    const certificate = await db.select().from(certificates).where(and(eq(certificates.studentId, studentId), eq(certificates.courseId, course.id))).limit(1);
+    return { course, enrollment, certificate: certificate[0] ?? null };
+  }));
+  return { learner, entries };
 }
