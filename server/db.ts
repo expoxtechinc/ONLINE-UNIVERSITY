@@ -1,0 +1,303 @@
+import { and, desc, eq } from "drizzle-orm";
+import { randomUUID } from "crypto";
+import { drizzle } from "drizzle-orm/mysql2";
+import { accountCredentials, certificates, courseAssets, courseModules, courses, enrollments, lessons, paymentEvents, type InsertUser, users } from "../drizzle/schema";
+import { ENV } from "./_core/env";
+import { hashSecret, normalizeUsername } from "./security";
+
+let _db: ReturnType<typeof drizzle> | null = null;
+
+// Lazily create the drizzle instance so local tooling can run without a DB.
+export async function getDb() {
+  if (!_db && process.env.DATABASE_URL) {
+    try {
+      _db = drizzle(process.env.DATABASE_URL);
+    } catch (error) {
+      console.warn("[Database] Failed to connect:", error);
+      _db = null;
+    }
+  }
+  return _db;
+}
+
+export async function upsertUser(user: InsertUser): Promise<void> {
+  if (!user.openId) {
+    throw new Error("User openId is required for upsert");
+  }
+
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot upsert user: database not available");
+    return;
+  }
+
+  try {
+    const values: InsertUser = {
+      openId: user.openId,
+    };
+    const updateSet: Record<string, unknown> = {};
+
+    const textFields = ["name", "email", "loginMethod"] as const;
+    type TextField = (typeof textFields)[number];
+
+    const assignNullable = (field: TextField) => {
+      const value = user[field];
+      if (value === undefined) return;
+      const normalized = value ?? null;
+      values[field] = normalized;
+      updateSet[field] = normalized;
+    };
+
+    textFields.forEach(assignNullable);
+
+    if (user.lastSignedIn !== undefined) {
+      values.lastSignedIn = user.lastSignedIn;
+      updateSet.lastSignedIn = user.lastSignedIn;
+    }
+    if (user.role !== undefined) {
+      values.role = user.role;
+      updateSet.role = user.role;
+    } else if (user.openId === ENV.ownerOpenId) {
+      values.role = "admin";
+      updateSet.role = "admin";
+    }
+
+    if (!values.lastSignedIn) {
+      values.lastSignedIn = new Date();
+    }
+
+    if (Object.keys(updateSet).length === 0) {
+      updateSet.lastSignedIn = new Date();
+    }
+
+    await db.insert(users).values(values).onDuplicateKeyUpdate({
+      set: updateSet,
+    });
+  } catch (error) {
+    console.error("[Database] Failed to upsert user:", error);
+    throw error;
+  }
+}
+
+export async function getUserByOpenId(openId: string) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get user: database not available");
+    return undefined;
+  }
+
+  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getCredentialByUsername(username: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const result = await db.select().from(accountCredentials).where(eq(accountCredentials.username, normalizeUsername(username))).limit(1);
+  return result[0] ?? null;
+}
+
+export async function getUserById(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+  return result[0] ?? null;
+}
+
+export async function ensureBootstrapAdministrator() {
+  const username = process.env.BOOTSTRAP_ADMIN_USERNAME;
+  const password = process.env.BOOTSTRAP_ADMIN_PASSWORD;
+  const email = process.env.BOOTSTRAP_ADMIN_EMAIL;
+  const pin = process.env.BOOTSTRAP_ADMIN_PIN;
+  if (!username || !password || !email) return null;
+  const existing = await getCredentialByUsername(username);
+  if (existing) return getUserById(existing.userId);
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const passwordSecret = await hashSecret(password);
+  const pinSecret = pin ? await hashSecret(pin) : null;
+  const openId = `local:${normalizeUsername(username)}`;
+  const result = await db.insert(users).values({ openId, name: "Akin Sokpah", email, loginMethod: "password", role: "admin", lastSignedIn: new Date() });
+  const userId = Number(result[0].insertId);
+  await db.insert(accountCredentials).values({ userId, username: normalizeUsername(username), passwordHash: passwordSecret.hash, passwordSalt: passwordSecret.salt, recoveryPinHash: pinSecret?.hash ?? null });
+  return getUserById(userId);
+}
+
+export async function createLocalUser(input: { username: string; email: string; name: string; password: string; role?: "student" | "instructor" }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const username = normalizeUsername(input.username);
+  const existing = await getCredentialByUsername(username);
+  if (existing) throw new Error("Username is already in use");
+  const secret = await hashSecret(input.password);
+  const result = await db.insert(users).values({ openId: `local:${username}`, name: input.name, email: input.email.toLowerCase(), loginMethod: "password", role: input.role ?? "student", lastSignedIn: new Date() });
+  const userId = Number(result[0].insertId);
+  await db.insert(accountCredentials).values({ userId, username, passwordHash: secret.hash, passwordSalt: secret.salt });
+  return getUserById(userId);
+}
+
+export async function listPublishedCourses() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(courses).where(eq(courses.status, "published"));
+}
+
+export async function listAuthorCourses(authorId: number, isAdmin: boolean) {
+  const db = await getDb();
+  if (!db) return [];
+  return isAdmin ? db.select().from(courses) : db.select().from(courses).where(eq(courses.authorId, authorId));
+}
+
+export async function getCourseById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(courses).where(eq(courses.id, id)).limit(1);
+  return result[0] ?? null;
+}
+
+export async function createCourse(input: Omit<typeof courses.$inferInsert, "id" | "createdAt" | "updatedAt">) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const result = await db.insert(courses).values(input);
+  return getCourseById(Number(result[0].insertId));
+}
+
+export async function updateCourse(id: number, input: Partial<typeof courses.$inferInsert>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.update(courses).set(input).where(eq(courses.id, id));
+  return getCourseById(id);
+}
+
+export async function archiveCourse(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const course = await getCourseById(id);
+  if (!course) throw new Error("Course not found");
+  await db.update(courses).set({ status: "archived" }).where(eq(courses.id, id));
+  return getCourseById(id);
+}
+
+export async function listUsersForAdmin() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({ id: users.id, name: users.name, email: users.email, role: users.role, createdAt: users.createdAt, lastSignedIn: users.lastSignedIn }).from(users).orderBy(desc(users.createdAt));
+}
+
+export async function updateUserRole(id: number, role: "student" | "instructor" | "admin") {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const user = await getUserById(id);
+  if (!user) throw new Error("User not found");
+  if (user.role === "admin" && role !== "admin") {
+    const admins = await db.select({ id: users.id }).from(users).where(eq(users.role, "admin"));
+    if (admins.length <= 1) throw new Error("At least one administrator account must remain active");
+  }
+  await db.update(users).set({ role }).where(eq(users.id, id));
+  return getUserById(id);
+}
+
+export async function createModule(input: typeof courseModules.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const result = await db.insert(courseModules).values(input);
+  return Number(result[0].insertId);
+}
+
+export async function createLesson(input: typeof lessons.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const result = await db.insert(lessons).values(input);
+  return Number(result[0].insertId);
+}
+
+export async function getModuleById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(courseModules).where(eq(courseModules.id, id)).limit(1);
+  return result[0] ?? null;
+}
+
+export async function createCourseAsset(input: typeof courseAssets.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const result = await db.insert(courseAssets).values(input);
+  return Number(result[0].insertId);
+}
+
+export async function getCourseAssetByStorageKey(storageKey: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(courseAssets).where(eq(courseAssets.storageKey, storageKey)).limit(1);
+  return result[0] ?? null;
+}
+
+export async function getEnrollment(studentId: number, courseId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(enrollments).where(and(eq(enrollments.studentId, studentId), eq(enrollments.courseId, courseId))).limit(1);
+  return result[0] ?? null;
+}
+
+export async function createPendingEnrollment(studentId: number, courseId: number, amount: number, currency: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const existing = await getEnrollment(studentId, courseId);
+  if (existing) return existing;
+  const result = await db.insert(enrollments).values({ studentId, courseId, paidAmountCents: amount, currency, status: "pending_payment" });
+  const created = await db.select().from(enrollments).where(eq(enrollments.id, Number(result[0].insertId))).limit(1);
+  return created[0];
+}
+
+export async function attachStripeCheckout(enrollmentId: number, sessionId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.update(enrollments).set({ stripeCheckoutSessionId: sessionId }).where(eq(enrollments.id, enrollmentId));
+}
+
+export async function completeEnrollmentPayment(input: { enrollmentId: number; sessionId: string; paymentIntentId?: string | null; eventId: string; payload: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const duplicate = await db.select().from(paymentEvents).where(eq(paymentEvents.stripeEventId, input.eventId)).limit(1);
+  if (duplicate[0]) return;
+  await db.insert(paymentEvents).values({ stripeEventId: input.eventId, enrollmentId: input.enrollmentId, eventType: "checkout.session.completed", payload: input.payload });
+  await db.update(enrollments).set({ status: "active", stripeCheckoutSessionId: input.sessionId, stripePaymentIntentId: input.paymentIntentId ?? null, enrolledAt: new Date() }).where(eq(enrollments.id, input.enrollmentId));
+}
+
+export async function listCertificatesForAdmin() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({ certificate: certificates, courseTitle: courses.title, learnerName: users.name, learnerEmail: users.email }).from(certificates).innerJoin(courses, eq(certificates.courseId, courses.id)).innerJoin(users, eq(certificates.studentId, users.id)).orderBy(desc(certificates.issuedAt));
+}
+
+export async function issueCertificate(input: { studentId: number; courseId: number; finalScore: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const course = await getCourseById(input.courseId);
+  const student = await getUserById(input.studentId);
+  if (!course || course.certificateEligible !== "yes") throw new Error("This course is not eligible for certificates");
+  if (!student) throw new Error("Learner not found");
+  const enrollment = await getEnrollment(input.studentId, input.courseId);
+  if (!enrollment || !["active", "completed"].includes(enrollment.status)) throw new Error("Learner does not have an eligible enrollment");
+  if (input.finalScore < 0 || input.finalScore > 100) throw new Error("Final score must be between 0 and 100");
+  const existing = await db.select().from(certificates).where(and(eq(certificates.studentId, input.studentId), eq(certificates.courseId, input.courseId))).limit(1);
+  if (existing[0]) return existing[0];
+  const verificationCode = `OU-${randomUUID().replace(/-/g, "").slice(0, 18).toUpperCase()}`;
+  const result = await db.insert(certificates).values({ studentId: input.studentId, courseId: input.courseId, finalScore: input.finalScore, verificationCode, issuedAt: new Date() });
+  const created = await db.select().from(certificates).where(eq(certificates.id, Number(result[0].insertId))).limit(1);
+  return created[0];
+}
+
+export async function revokeCertificate(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.update(certificates).set({ revokedAt: new Date() }).where(eq(certificates.id, id));
+}
+
+export async function getCertificateByVerificationCode(verificationCode: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select({ certificate: certificates, courseTitle: courses.title, learnerName: users.name }).from(certificates).innerJoin(courses, eq(certificates.courseId, courses.id)).innerJoin(users, eq(certificates.studentId, users.id)).where(eq(certificates.verificationCode, verificationCode)).limit(1);
+  return result[0] ?? null;
+}

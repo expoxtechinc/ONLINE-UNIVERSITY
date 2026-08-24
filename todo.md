@@ -1,0 +1,25 @@
+# Project TODO
+
+- [x] Establish Online University visual theme, app routes, and local domain data.
+- [x] Create student bottom navigation and personalized student dashboard.
+- [x] Implement course search, categories, filters, and course detail enrollment flow.
+- [x] Implement learning player with lessons, progress tracking, flashcards, and quizzes.
+- [x] Implement My Learning, results, certificate, and certificate verification experiences.
+- [x] Implement separate administrator dashboard and course publishing workflow.
+- [x] Implement course editor with module and learning-content controls.
+- [x] Generate and apply a custom Online University academic app icon and branding metadata.
+- [x] Add deterministic tests for local enrollment, progress, assessment, and publishing behavior.
+- [x] Validate TypeScript and test suite; review the full TODO before creating the checkpoint.
+- [x] Add secure role-based account creation, session handling, and administrator bootstrap.
+- [ ] Add email-delivered password reset once a transactional email provider is configured.
+- [x] Replace locally persisted learner and course state with protected server-side data access.
+- [x] Add administrator-only course authoring with server-backed course, module, lesson, and assessment records.
+- [x] Add rich-text article authoring and secure hosted video upload/playback support.
+- [x] Integrate secure course enrollment checkout without handling payment card data in the app.
+- [x] Add public certificate verification API and verification screen backed by issued certificate records.
+- [x] Add authorization, validation, and transaction tests for production workflows.
+- [x] Audit repository structure and adapt the server architecture for Vercel-compatible deployment.
+- [x] Add administrator user management, course deletion safeguards, and certificate issuance controls.
+- [x] Build an original certificate layout with the supplied signature and QR-linked public verification.
+- [x] Add Vercel configuration, environment-variable documentation, and production deployment checks.
+- [ ] Push the completed codebase and documentation to expoxtechinc/ONLINE-UNIVERSITY.
