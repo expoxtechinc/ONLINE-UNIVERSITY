@@ -39,7 +39,7 @@
 - [ ] Integrate Supabase email/password and Google authentication with administrator access for the approved founder account.
 - [x] Move course authoring, enrollment, certificates, transcripts, and administrative operations to Supabase-backed workflows.
 - [ ] Redesign globally oriented credential documents with a founder signature treatment and verified QR records.
-- [ ] Validate security controls and synchronize the Supabase integration to GitHub.
+- [x] Validate security controls and synchronize the Supabase integration to GitHub.
 - [x] Create a dedicated Online University Supabase project in the existing organization after cost confirmation.
 - [x] Configure founder super-admin governance for the approved Google identity and local administrator account.
 - [x] Add Google OAuth configuration and Supabase-backed authentication documentation.
