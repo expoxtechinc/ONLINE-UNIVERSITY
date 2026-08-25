@@ -5,6 +5,9 @@
   "buildCommand": "pnpm build:vercel",
   "devCommand": "pnpm dev",
   "outputDirectory": "web-dist",
+  "git": {
+    "deploymentEnabled": false
+  },
   "functions": {
     "api/[...path].ts": {
       "memory": 1024,
