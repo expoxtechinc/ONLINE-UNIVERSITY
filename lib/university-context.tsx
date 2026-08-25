@@ -17,6 +17,7 @@ type UniversityContextValue = UniversityState & {
   setProgress: (courseId: string, value: number) => void;
   awardCertificate: (courseId: string, finalScore: number) => Certificate;
   setCourseStatus: (courseId: string, status: CourseStatus) => void;
+  refresh: () => Promise<void>;
 };
 
 const STORAGE_KEY = "online-university-state-v1";
@@ -41,13 +42,19 @@ export function UniversityProvider({ children }: PropsWithChildren) {
   const [state, setState] = useState<UniversityState>(initialState);
   const [isReady, setIsReady] = useState(false);
 
+  const refresh = async () => {
+    try {
+      const stored = await AsyncStorage.getItem(STORAGE_KEY);
+      if (stored) setState(JSON.parse(stored) as UniversityState);
+    } catch {
+      // Keep the last known learning state available during offline recovery.
+    } finally {
+      setIsReady(true);
+    }
+  };
+
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then((stored) => {
-        if (stored) setState(JSON.parse(stored) as UniversityState);
-      })
-      .catch(() => undefined)
-      .finally(() => setIsReady(true));
+    void refresh();
   }, []);
 
   useEffect(() => {
@@ -81,6 +88,7 @@ export function UniversityProvider({ children }: PropsWithChildren) {
         return certificate;
       },
       setCourseStatus: (courseId, status) => setState((current) => ({ ...current, statuses: { ...current.statuses, [courseId]: status } })),
+      refresh,
     }),
     [isReady, state],
   );

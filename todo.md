@@ -53,3 +53,10 @@
 - [x] Support the configured Vercel Supabase variable aliases during Expo web export.
 - [x] Fix deployed Expo web configuration so Vercel Supabase variables are available to the browser bundle.
 - [x] Disable GitHub-triggered Vercel deployments while retaining the user-specified Online University deployment.
+- [ ] Create a manual Vercel production deployment from the latest validated source and provide the verified live URL.
+- [ ] Securely validate a user-authorized Vercel deployment token and use it only for the requested manual release.
+- [ ] Resolve the Vercel team-access release block and verify the manual production deployment becomes publicly available.
+- [ ] Fix Google OAuth redirect mismatch and replace broken sign-in loading behavior with resilient recovery states.
+- [x] Add resilient OAuth callback handling, sign-in recovery states, and Google configuration documentation.
+- [x] Add reliable dashboard refresh controls and role-aware production dashboard safeguards.
+- [ ] Confirm whether nassboss231@gmail.com should be added to the super-admin allowlist before granting elevated access.

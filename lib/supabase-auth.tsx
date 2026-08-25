@@ -6,6 +6,7 @@ import { Platform } from "react-native";
 import type { Session } from "@supabase/supabase-js";
 
 import { isSupabaseConfigured, requireSupabaseConfiguration, supabase, type UniversityProfile } from "@/lib/supabase";
+import { webAuthRedirectUri } from "@/lib/auth-redirects";
 
 if (typeof window !== "undefined") WebBrowser.maybeCompleteAuthSession();
 
@@ -78,7 +79,7 @@ export function SupabaseAuthProvider({ children }: PropsWithChildren) {
 
   const signUp = useCallback(async ({ email, password, fullName }: { email: string; password: string; fullName: string }) => {
     requireSupabaseConfiguration();
-    const redirectTo = Platform.OS === "web" ? (typeof window !== "undefined" ? window.location.origin : undefined) : AuthSession.makeRedirectUri({ scheme: "onlineuniversity", path: "auth/callback" });
+    const redirectTo = Platform.OS === "web" ? (typeof window !== "undefined" ? webAuthRedirectUri(window.location.origin) : undefined) : AuthSession.makeRedirectUri({ scheme: "onlineuniversity", path: "auth/callback" });
     const { data, error: signUpError } = await supabase.auth.signUp({ email: email.trim().toLowerCase(), password, options: { data: { full_name: fullName.trim() }, emailRedirectTo: redirectTo } });
     if (signUpError) throw signUpError;
     return !data.session;
@@ -87,7 +88,7 @@ export function SupabaseAuthProvider({ children }: PropsWithChildren) {
   const signInWithGoogle = useCallback(async () => {
     requireSupabaseConfiguration();
     if (Platform.OS === "web") {
-      const redirectTo = typeof window !== "undefined" ? window.location.origin : undefined;
+      const redirectTo = typeof window !== "undefined" ? webAuthRedirectUri(window.location.origin) : undefined;
       const { error: signInError } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo } });
       if (signInError) throw signInError;
       return;
