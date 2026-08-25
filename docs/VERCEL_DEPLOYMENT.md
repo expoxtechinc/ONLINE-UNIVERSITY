@@ -8,8 +8,8 @@ Online University is configured as an **Expo static web export plus a Vercel Nod
 
 | Variable | Scope | Required purpose |
 |---|---|---|
-| `EXPO_PUBLIC_SUPABASE_URL` | Expo web/mobile bundle | Dedicated Online University Supabase URL. |
-| `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Expo web/mobile bundle | Supabase publishable client key; access is limited by RLS. |
+| `EXPO_PUBLIC_SUPABASE_URL` or `SUPABASE_URL` | Expo web/mobile bundle | Dedicated Online University Supabase URL. The app maps the configured `SUPABASE_URL` alias into Expo’s public build variable. |
+| `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` or `SUPABASE_PUBLISHABLE_KEY` | Expo web/mobile bundle | Supabase publishable client key; access is limited by RLS. The configured alias is mapped during Expo export. |
 | `DATABASE_URL` | Vercel API only, while legacy routes remain | Production MySQL-compatible connection string with TLS enabled. |
 | `JWT_SECRET` | Vercel API only, while legacy local sessions remain | Long, random session-signing secret. |
 | `BOOTSTRAP_ADMIN_USERNAME`, `BOOTSTRAP_ADMIN_PASSWORD`, `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PIN` | Vercel API only, legacy bootstrap only | Initial local administrator credentials; rotate after use. |
@@ -38,7 +38,7 @@ The app’s Google sign-in callback is handled by `/oauth/callback` on web and t
 1. In Vercel, select **Add New → Project**, then import `expoxtechinc/ONLINE-UNIVERSITY`.
 2. Set the root directory to `./`, select **Other** as the framework preset, and keep the repository’s `vercel.json`.
 3. Set Node.js to **22.x**. Use `pnpm install --frozen-lockfile`, build command `pnpm build:vercel`, and output directory `web-dist`.
-4. Add the production variables in the preceding table. Values for `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` must match the dedicated Online University project; all other sensitive values stay server-only.
+4. Add the production variables in the preceding table. Either the `EXPO_PUBLIC_*` names or the supported `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` aliases must match the dedicated Online University project; all other sensitive values stay server-only.
 5. Deploy from `main`. Vercel builds `api/[...path].ts` as the Node.js function and serves the Expo web export from `web-dist`.
 
 If legacy Stripe checkout remains enabled, configure its production webhook after the first production deployment:

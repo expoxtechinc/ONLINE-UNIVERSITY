@@ -47,3 +47,7 @@
 - [ ] Confirm the exact founder Google email before changing the existing super-admin allowlist entry.
 - [x] Remove development-only app surfaces, complete final global-release validation, and push the cleaned source to GitHub.
 - [x] Fix Vercel static export when Supabase public build variables are absent, then revalidate and push the deployment correction.
+- [x] Expand the super-admin dashboard for user and course management.
+- [x] Add course filtering and sorting controls to dashboard discovery.
+- [x] Improve sign-in loading states and Supabase connection error handling.
+- [x] Support the configured Vercel Supabase variable aliases during Expo web export.
