@@ -59,4 +59,6 @@
 - [ ] Fix Google OAuth redirect mismatch and replace broken sign-in loading behavior with resilient recovery states.
 - [x] Add resilient OAuth callback handling, sign-in recovery states, and Google configuration documentation.
 - [x] Add reliable dashboard refresh controls and role-aware production dashboard safeguards.
-- [ ] Confirm whether nassboss231@gmail.com should be added to the super-admin allowlist before granting elevated access.
+- [x] Confirm whether nassboss231@gmail.com should be added to the super-admin allowlist before granting elevated access.
+- [x] Add user-approved nassboss231@gmail.com to the Supabase super-admin allowlist and validate the protected role outcome.
+- [x] Enhance super-admin user management with explicit role assignment and revocation controls.
