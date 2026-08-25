@@ -32,8 +32,11 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
-.env*.local
+# local env files and generated Supabase deployment payloads
+.env
+.env.*
+!.env.example
+supabase/*_input.json
 
 # typescript
 *.tsbuildinfo

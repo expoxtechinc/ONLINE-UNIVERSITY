@@ -45,3 +45,4 @@
 - [x] Add Google OAuth configuration and Supabase-backed authentication documentation.
 - [x] Apply the globally oriented certificate design with the Sokpah cursive signature treatment and QR verification.
 - [ ] Confirm the exact founder Google email before changing the existing super-admin allowlist entry.
+- [x] Remove development-only app surfaces, complete final global-release validation, and push the cleaned source to GitHub.

@@ -40,7 +40,7 @@ export default function VerifyCertificateScreen() {
 
   const localCertificate = certificates.find((item) => item.id === certificateId) ?? certificates[0];
   const localCourse = getCourse(localCertificate?.courseId);
-  const valid = remote?.valid ?? Boolean(localCertificate);
+  const valid = Boolean(remote?.valid);
   const learnerName = remote?.learner_name ?? localCertificate?.learnerName ?? "Learner";
   const courseName = remote?.course_title ?? localCourse.title;
   const issuedAt = remote ? new Date(remote.issued_at).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : localCertificate?.issuedAt ?? "";
