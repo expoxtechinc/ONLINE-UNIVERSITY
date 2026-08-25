@@ -46,9 +46,9 @@ export async function generateCertificatePdf(input: CertificateDocumentInput) {
     document.fillColor("#627D98").font("Helvetica").fontSize(11).text("has successfully completed", 55, 277);
     document.fillColor("#183B65").font("Helvetica-Bold").fontSize(19).text(input.courseName, 55, 296, { width: 440 });
     document.fillColor("#4A5E73").font("Helvetica").fontSize(10).text("This credential was generated from the learner’s verified Online University academic record.", 55, 345, { width: 420, lineGap: 3 });
-    document.fillColor("#D6A84B").font("Helvetica-Oblique").fontSize(23).text("Akin S.", 55, 405);
+    document.fillColor("#D6A84B").font("Helvetica-Oblique").fontSize(23).text("Sokpah", 55, 405);
     document.strokeColor("#102A43").lineWidth(0.8).moveTo(55, 436).lineTo(190, 436).stroke();
-    document.fillColor("#4A5E73").font("Helvetica").fontSize(9).text("Authorized Registrar · Online University", 55, 443);
+    document.fillColor("#4A5E73").font("Helvetica").fontSize(9).text("Akin S. Sokpah · CEO & Founder, Online University", 55, 443);
     document.fillColor("#627D98").font("Helvetica-Bold").fontSize(8).text("CERTIFICATE ID", 55, 497, { characterSpacing: 1 });
     document.fillColor("#102A43").font("Helvetica-Bold").fontSize(10).text(input.verificationCode, 55, 510);
     document.fillColor("#627D98").font("Helvetica-Bold").fontSize(8).text("FINAL SCORE", 265, 497, { characterSpacing: 1 });

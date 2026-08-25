@@ -33,4 +33,15 @@
 - [x] Validate certificate PDF generation and QR verification URL generation locally.
 - [x] Provide the required Vercel environment-variable checklist and connection instructions.
 - [ ] Diagnose the persisting Vercel failure after the API entrypoint fix and implement a Vite-compatible deployment build if required.
-- [ ] Diagnose and fix the deployment error contained in pasted_content_3.txt, then push the targeted correction.
+- [x] Diagnose and fix the deployment error contained in pasted_content_3.txt, then push the targeted correction.
+- [x] Inspect the connected Supabase project and document the production identity, data, storage, and access-control model.
+- [x] Provision Supabase tables, encrypted private storage buckets, role policies, and administrator allowlist controls.
+- [ ] Integrate Supabase email/password and Google authentication with administrator access for the approved founder account.
+- [x] Move course authoring, enrollment, certificates, transcripts, and administrative operations to Supabase-backed workflows.
+- [ ] Redesign globally oriented credential documents with a founder signature treatment and verified QR records.
+- [ ] Validate security controls and synchronize the Supabase integration to GitHub.
+- [x] Create a dedicated Online University Supabase project in the existing organization after cost confirmation.
+- [x] Configure founder super-admin governance for the approved Google identity and local administrator account.
+- [x] Add Google OAuth configuration and Supabase-backed authentication documentation.
+- [x] Apply the globally oriented certificate design with the Sokpah cursive signature treatment and QR verification.
+- [ ] Confirm the exact founder Google email before changing the existing super-admin allowlist entry.

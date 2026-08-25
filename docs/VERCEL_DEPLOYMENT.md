@@ -1,52 +1,63 @@
 # Vercel deployment guide
 
-Online University is configured as an **Expo web export plus a Vercel Node.js API function**. The supported `api/[...path].ts` catch-all function loads the protected Express API, while Vercel serves the exported Expo web application from `web-dist/`. The build output is generated at deployment time and is not committed to source control.
+Online University is configured as an **Expo static web export plus a Vercel Node.js API function**. Vercel serves the Expo export from `web-dist/`, while the supported `api/[...path].ts` catch-all function loads the legacy Express endpoints that remain in use for Stripe checkout, local PDF document generation, and any legacy MySQL workflows. The primary identity, course, role-governance, protected media, assessment, audit, and global certificate-verification foundation is the dedicated Supabase project.
+
+> Never commit credentials to GitHub. The two `EXPO_PUBLIC_SUPABASE_*` values are deliberately client-visible identifiers protected by Supabase Row Level Security; **service-role keys, OAuth secrets, Stripe secrets, database URLs, and bootstrap credentials must remain server-only**.
 
 ## Required production environment variables
 
-| Variable | Required purpose |
+| Variable | Scope | Required purpose |
+|---|---|---|
+| `EXPO_PUBLIC_SUPABASE_URL` | Expo web/mobile bundle | Dedicated Online University Supabase URL. |
+| `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Expo web/mobile bundle | Supabase publishable client key; access is limited by RLS. |
+| `DATABASE_URL` | Vercel API only, while legacy routes remain | Production MySQL-compatible connection string with TLS enabled. |
+| `JWT_SECRET` | Vercel API only, while legacy local sessions remain | Long, random session-signing secret. |
+| `BOOTSTRAP_ADMIN_USERNAME`, `BOOTSTRAP_ADMIN_PASSWORD`, `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PIN` | Vercel API only, legacy bootstrap only | Initial local administrator credentials; rotate after use. |
+| `ONLINE_UNIVERSITY_STRIPE_SECRET_KEY` | Vercel API only | Stripe server secret key. |
+| `ONLINE_UNIVERSITY_STRIPE_WEBHOOK_SECRET` | Vercel API only | Stripe production webhook signing secret. |
+| `ALLOWED_ORIGINS` | Vercel API only | Comma-separated deployed app origins allowed for credentialed API calls. |
+
+The Supabase storage buckets `course-media` and `credential-documents` are private and RLS-protected. Do **not** configure Vercel Blob for new course media or credential documents; it is now a legacy optional adapter only. Do not place a Supabase service-role key in Vercel client variables, Expo configuration, or the Git repository.
+
+## Google OAuth configuration
+
+Google sign-in is enabled in the dedicated Supabase project. Before production launch, retain the following configuration in the correct locations:
+
+| Location | Value or requirement |
 |---|---|
-| `DATABASE_URL` | Production MySQL-compatible database connection string with TLS enabled. |
-| `JWT_SECRET` | Long, random signing secret for application sessions. |
-| `BOOTSTRAP_ADMIN_USERNAME` | Initial administrator username. |
-| `BOOTSTRAP_ADMIN_PASSWORD` | Initial administrator password; replace after first sign-in. |
-| `BOOTSTRAP_ADMIN_EMAIL` | Administrator email address. |
-| `BOOTSTRAP_ADMIN_PIN` | Administrator recovery PIN. |
-| `ONLINE_UNIVERSITY_STRIPE_SECRET_KEY` | Stripe server secret key. Never expose to the mobile/web bundle. |
-| `ONLINE_UNIVERSITY_STRIPE_WEBHOOK_SECRET` | Signing secret for the production Stripe webhook. |
-| `BLOB_READ_WRITE_TOKEN` | Vercel Blob token for course video, image, and document storage when working outside Vercel. |
-| `BLOB_STORE_ID` and `VERCEL_OIDC_TOKEN` | Automatically provided when a private Vercel Blob store is connected to the Vercel project; preferred in production. |
-| `ALLOWED_ORIGINS` | Comma-separated app domains allowed to make credentialed cross-origin API calls, if any. |
+| Google Cloud OAuth client | Authorized redirect URI: `https://oevgnonkqpvfvjsmovpw.supabase.co/auth/v1/callback` |
+| Supabase Auth → URL configuration | Site URL: the canonical production domain, for example `https://YOUR_DOMAIN` |
+| Supabase Auth → URL configuration | Additional redirect URL: `https://YOUR_DOMAIN/oauth/callback` |
+| Supabase Auth → URL configuration | Native redirect URL: `onlineuniversity://auth/callback` |
+| Vercel | Add the Supabase public URL and publishable key for the **Production** environment, and use separate values for Preview only if a separate Supabase project is provisioned. |
+
+The app’s Google sign-in callback is handled by `/oauth/callback` on web and the `onlineuniversity` URL scheme on native builds. A Google provider setting is included in release validation; do not treat a dashboard toggle alone as sufficient verification.
 
 ## Vercel project setup
 
 1. In Vercel, select **Add New → Project**, then import `expoxtechinc/ONLINE-UNIVERSITY`.
-2. Set the project root directory to `./`, select **Other** as the framework preset, and retain the repository’s `vercel.json` settings.
-3. Set Node.js to **22.x**. The repository install command is `pnpm install --frozen-lockfile`; the build command is `pnpm build:vercel`; and the static output directory is `web-dist`.
-4. Add the environment variables above to the **Production** environment. Add Preview values only when using a separate preview database and Stripe test configuration.
-5. Deploy from `main`. Vercel compiles `api/[...path].ts` as the serverless API function and serves the Expo export from `web-dist`.
+2. Set the root directory to `./`, select **Other** as the framework preset, and keep the repository’s `vercel.json`.
+3. Set Node.js to **22.x**. Use `pnpm install --frozen-lockfile`, build command `pnpm build:vercel`, and output directory `web-dist`.
+4. Add the production variables in the preceding table. Values for `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` must match the dedicated Online University project; all other sensitive values stay server-only.
+5. Deploy from `main`. Vercel builds `api/[...path].ts` as the Node.js function and serves the Expo web export from `web-dist`.
 
-Keep `ONLINE_UNIVERSITY_STRIPE_SECRET_KEY`, webhook secrets, database URLs, and bootstrap credentials server-only. Do not add them as `EXPO_PUBLIC_*` variables.
-
-Create and connect a **private Vercel Blob** store for course media. Course uploads are stored privately and the application streams them only after checking the signed-in learner’s enrollment or authoring role. For large video uploads, use the Vercel Blob direct-upload workflow rather than proxying the file through a function; Vercel documents a 4.5 MB request-body limit for server uploads. [1] [2]
-
-After the first production deployment, configure the Stripe webhook URL as:
+If legacy Stripe checkout remains enabled, configure its production webhook after the first production deployment:
 
 ```text
 https://YOUR_DOMAIN/api/payments/stripe/webhook
 ```
 
-Subscribe to `checkout.session.completed`. The webhook signature is verified before a payment activates a course enrollment.
+Subscribe to `checkout.session.completed`; the webhook signature is validated before the legacy API activates an enrollment. A later migration should move payment-backed enrollment activation into a Supabase-aware server workflow so only one enrollment authority remains.
 
-## Configuration verification
+## Credential security and verification
 
-Vercel hides secret values after they are saved, so verify the configuration by confirming these **variable names** exist in the Production environment: `DATABASE_URL`, `JWT_SECRET`, `BOOTSTRAP_ADMIN_USERNAME`, `BOOTSTRAP_ADMIN_PASSWORD`, `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PIN`, `ONLINE_UNIVERSITY_STRIPE_SECRET_KEY`, `ONLINE_UNIVERSITY_STRIPE_WEBHOOK_SECRET`, and either `BLOB_READ_WRITE_TOKEN` or the connected private Blob-store credentials. Never store their values in GitHub or an `EXPO_PUBLIC_*` variable.
+Public QR codes resolve to the deployed `verify-certificate` Supabase Edge Function. The function returns only the minimum verification record for active, non-revoked certificates, while its privileged data lookup uses the server-only role. The database security advisor has no outstanding security findings after the current hardening migration.
 
-The local credential-document test generated both a certificate PDF containing a QR verification payload and an official transcript PDF successfully. Certificate QR codes are generated server-side at download time using the public verification URL.
+Assessment submission is handled by a separate JWT-protected Supabase Edge Function. It calculates the score on the server, records the attempt, checks required lesson completion, marks the enrollment completed when eligible, and creates a database-linked certificate record. The client must never be trusted to issue a certificate or set a grade.
 
 ## Release checks
 
-Run the following locally or in continuous integration before each release:
+Run the following before every deployment:
 
 ```bash
 pnpm check
@@ -55,10 +66,6 @@ pnpm test
 pnpm build:vercel
 ```
 
-The Vercel build configuration follows Expo’s published Vercel web-export guidance and Vercel’s Node.js server entrypoint model. See [Expo web publishing](https://docs.expo.dev/guides/publishing-websites/) and [Vercel Node.js runtime](https://vercel.com/docs/functions/runtimes/node-js).
+The current release validation covers the exact dedicated Supabase endpoint, enabled Google provider, public unknown-certificate behavior, protected assessment access, legacy endpoint authorization, certificate/transcript generation, TypeScript, linting, and the Vercel build target.
 
-## References
-
-[1] [Vercel Blob private storage](https://vercel.com/docs/vercel-blob/private-storage)
-
-[2] [Vercel Blob server uploads](https://vercel.com/docs/vercel-blob/server-upload)
+For platform references, see [Expo web publishing](https://docs.expo.dev/guides/publishing-websites/), [Vercel Node.js functions](https://vercel.com/docs/functions/runtimes/node-js), and [Supabase OAuth](https://supabase.com/docs/guides/auth/social-login/auth-google).

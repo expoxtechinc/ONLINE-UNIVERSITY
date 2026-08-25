@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import QRCode from "react-native-qrcode-svg";
 
-import { getApiBaseUrl } from "@/constants/oauth";
 import { ScreenContainer } from "@/components/screen-container";
 import { Pill, ScreenTitle } from "@/components/university-ui";
 import { getCourse } from "@/lib/university";
@@ -12,11 +11,11 @@ import { useUniversity } from "@/lib/university-context";
 
 type VerifiedCertificate = {
   valid: boolean;
-  verificationCode: string;
-  learnerName: string | null;
-  courseName: string;
-  finalScore: number;
-  issuedAt: string;
+  verification_code: string;
+  learner_name: string | null;
+  course_title: string;
+  final_score: number;
+  issued_at: string;
 };
 
 export default function VerifyCertificateScreen() {
@@ -27,25 +26,29 @@ export default function VerifyCertificateScreen() {
 
   useEffect(() => {
     let active = true;
-    fetch(`${getApiBaseUrl()}/api/certificates/${encodeURIComponent(certificateId)}`)
-      .then(async (response) => response.ok ? (await response.json()) as VerifiedCertificate : null)
-      .then((record) => { if (active) setRemote(record); })
-      .catch(() => undefined)
-      .finally(() => { if (active) setChecking(false); });
+    void (async () => {
+      try {
+        const response = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/verify-certificate?code=${encodeURIComponent(certificateId.toUpperCase())}`);
+        const data = response.ok ? await response.json() : null;
+        if (active) setRemote(data as VerifiedCertificate | null);
+      } catch {
+        if (active) setRemote(null);
+      } finally { if (active) setChecking(false); }
+    })();
     return () => { active = false; };
   }, [certificateId]);
 
   const localCertificate = certificates.find((item) => item.id === certificateId) ?? certificates[0];
   const localCourse = getCourse(localCertificate?.courseId);
   const valid = remote?.valid ?? Boolean(localCertificate);
-  const learnerName = remote?.learnerName ?? localCertificate?.learnerName ?? "Learner";
-  const courseName = remote?.courseName ?? localCourse.title;
-  const issuedAt = remote ? new Date(remote.issuedAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : localCertificate?.issuedAt ?? "";
-  const finalScore = remote?.finalScore ?? localCertificate?.finalScore ?? 0;
-  const resolvedId = remote?.verificationCode ?? localCertificate?.id ?? certificateId;
-  const publicVerificationUrl = useMemo(() => `${getApiBaseUrl().replace(/\/$/, "")}/verify/${encodeURIComponent(resolvedId)}`, [resolvedId]);
+  const learnerName = remote?.learner_name ?? localCertificate?.learnerName ?? "Learner";
+  const courseName = remote?.course_title ?? localCourse.title;
+  const issuedAt = remote ? new Date(remote.issued_at).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : localCertificate?.issuedAt ?? "";
+  const finalScore = remote?.final_score ?? localCertificate?.finalScore ?? 0;
+  const resolvedId = remote?.verification_code ?? localCertificate?.id ?? certificateId;
+  const publicVerificationUrl = useMemo(() => `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/verify-certificate?code=${encodeURIComponent(resolvedId)}`, [resolvedId]);
 
-  return <ScreenContainer edges={["top", "left", "right", "bottom"]} className="px-5"><ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}><Pressable onPress={() => router.back()} style={styles.back}><MaterialIcons name="arrow-back" size={21} color="#102A43" /></Pressable><ScreenTitle eyebrow="Credential verification" title={valid ? "Certificate verified" : "Certificate not found"} />{checking ? <View style={styles.checking}><ActivityIndicator color="#183B65" /><Text style={styles.checkingText}>Checking the public certificate registry…</Text></View> : null}{valid ? <><View style={styles.success}><View style={styles.verifiedSeal}><MaterialIcons name="verified" size={38} color="#177648" /></View><Pill label={remote ? "Public registry verified" : "Device record"} tone="green" /><Text style={styles.successTitle}>This credential is valid</Text><Text style={styles.successText}>The verification link and QR code resolve against the Online University certificate registry.</Text></View><View style={styles.certificateFrame}><View style={styles.certificate}><View style={styles.certificateWatermark}><MaterialIcons name="school" size={132} color="#D6A84B" /></View><View style={styles.certificateContent}><Text style={styles.wordmark}>ONLINE UNIVERSITY</Text><Text style={styles.certificateDate}>{issuedAt}</Text><Text style={styles.presented}>This certifies that</Text><Text style={styles.name} numberOfLines={2}>{learnerName}</Text><Text style={styles.presented}>has successfully completed</Text><Text style={styles.course} numberOfLines={2}>{courseName}</Text><Text style={styles.description}>This credential is issued through Online University’s verified academic record system.</Text><View style={styles.signatureBlock}><Text style={styles.signatureName}>Akin S.</Text><View style={styles.signatureRule} /><Text style={styles.signatureRole}>Authorized Registrar · Online University</Text></View><View style={styles.certificateFooter}><View><Text style={styles.detailLabel}>CERTIFICATE ID</Text><Text style={styles.detailValue}>{resolvedId}</Text></View><View><Text style={styles.detailLabel}>FINAL SCORE</Text><Text style={styles.detailValue}>{finalScore}%</Text></View></View></View><View style={styles.qrPanel}><Text style={styles.qrLabel}>SCAN TO VERIFY</Text><View style={styles.qrShell}><QRCode value={publicVerificationUrl} size={70} color="#102A43" backgroundColor="#FFFFFF" /></View><Text style={styles.qrCode}>{resolvedId}</Text></View></View></View><View style={styles.linkCard}><MaterialIcons name="link" size={19} color="#183B65" /><View style={{ flex: 1 }}><Text style={styles.linkLabel}>PUBLIC VERIFICATION LINK</Text><Text style={styles.linkText} numberOfLines={1}>{publicVerificationUrl}</Text></View></View></> : <View style={styles.notFound}><MaterialIcons name="gpp-bad" size={44} color="#C64545" /><Text style={styles.notFoundTitle}>No matching certificate</Text><Text style={styles.notFoundText}>Check the certificate ID and try again. A valid Online University certificate will show its learner, course, date, result, and QR verification record.</Text></View>}<Pressable onPress={() => router.replace("/certificates")} style={({ pressed }) => [styles.done, pressed && { opacity: 0.75 }]}><Text style={styles.doneText}>Return to certificates</Text></Pressable></ScrollView></ScreenContainer>;
+  return <ScreenContainer edges={["top", "left", "right", "bottom"]} className="px-5"><ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}><Pressable onPress={() => router.back()} style={styles.back}><MaterialIcons name="arrow-back" size={21} color="#102A43" /></Pressable><ScreenTitle eyebrow="Credential verification" title={valid ? "Certificate verified" : "Certificate not found"} />{checking ? <View style={styles.checking}><ActivityIndicator color="#183B65" /><Text style={styles.checkingText}>Checking the global certificate registry…</Text></View> : null}{valid ? <><View style={styles.success}><View style={styles.verifiedSeal}><MaterialIcons name="verified" size={38} color="#177648" /></View><Pill label={remote ? "Global registry verified" : "Device record"} tone="green" /><Text style={styles.successTitle}>This credential is valid</Text><Text style={styles.successText}>The verification link and QR code resolve against the Online University global certificate registry.</Text></View><View style={styles.certificateFrame}><View style={styles.certificate}><View style={styles.certificateWatermark}><MaterialIcons name="school" size={132} color="#D6A84B" /></View><View style={styles.certificateContent}><Text style={styles.wordmark}>ONLINE UNIVERSITY</Text><Text style={styles.certificateDate}>{issuedAt}</Text><Text style={styles.presented}>This certifies that</Text><Text style={styles.name} numberOfLines={2}>{learnerName}</Text><Text style={styles.presented}>has successfully completed</Text><Text style={styles.course} numberOfLines={2}>{courseName}</Text><Text style={styles.description}>This credential is issued through Online University’s verified academic record system.</Text><View style={styles.signatureBlock}><Text style={styles.signatureName}>Sokpah</Text><View style={styles.signatureRule} /><Text style={styles.signatureRole}>Akin S. Sokpah · CEO & Founder</Text></View><View style={styles.certificateFooter}><View><Text style={styles.detailLabel}>CERTIFICATE ID</Text><Text style={styles.detailValue}>{resolvedId}</Text></View><View><Text style={styles.detailLabel}>FINAL SCORE</Text><Text style={styles.detailValue}>{finalScore}%</Text></View></View></View><View style={styles.qrPanel}><Text style={styles.qrLabel}>SCAN TO VERIFY</Text><View style={styles.qrShell}><QRCode value={publicVerificationUrl} size={70} color="#102A43" backgroundColor="#FFFFFF" /></View><Text style={styles.qrCode}>{resolvedId}</Text></View></View></View><View style={styles.linkCard}><MaterialIcons name="link" size={19} color="#183B65" /><View style={{ flex: 1 }}><Text style={styles.linkLabel}>GLOBAL VERIFICATION LINK</Text><Text style={styles.linkText} numberOfLines={1}>{publicVerificationUrl}</Text></View></View></> : <View style={styles.notFound}><MaterialIcons name="gpp-bad" size={44} color="#C64545" /><Text style={styles.notFoundTitle}>No matching certificate</Text><Text style={styles.notFoundText}>Check the certificate ID and try again. A valid Online University certificate will show its learner, course, date, result, and QR verification record.</Text></View>}<Pressable onPress={() => router.replace("/certificates")} style={({ pressed }) => [styles.done, pressed && { opacity: 0.75 }]}><Text style={styles.doneText}>Return to certificates</Text></Pressable></ScrollView></ScreenContainer>;
 }
 
 const styles = StyleSheet.create({
