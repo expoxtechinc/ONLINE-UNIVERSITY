@@ -1,10 +1,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import { createClient } from "@supabase/supabase-js";
 
-const configuredUrl = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() ?? "";
-const configuredPublishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ?? "";
+const extra = Constants.expoConfig?.extra ?? {};
+const configuredUrl = (process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() || (typeof extra.supabaseUrl === "string" ? extra.supabaseUrl.trim() : ""));
+const configuredPublishableKey = (process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() || (typeof extra.supabasePublishableKey === "string" ? extra.supabasePublishableKey.trim() : ""));
 
 /**
  * A static Vercel export evaluates modules before browser runtime variables are
@@ -18,7 +20,7 @@ const publishableKey = configuredPublishableKey || "build-time-placeholder";
 
 export function requireSupabaseConfiguration() {
   if (!isSupabaseConfigured) {
-    throw new Error("Online University is not configured for this deployment. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY in Vercel, then redeploy.");
+    throw new Error("Online University is not configured for this deployment. Add SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in Vercel, then redeploy.");
   }
 }
 

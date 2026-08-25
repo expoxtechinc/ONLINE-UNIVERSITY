@@ -10,7 +10,7 @@ import { useSupabaseAuth } from "@/lib/supabase-auth";
 function userMessage(error: unknown) {
   const message = error instanceof Error ? error.message : "";
   const lower = message.toLowerCase();
-  if (lower.includes("not configured")) return "This deployment is missing its secure Supabase connection. Ask an administrator to add the public Supabase settings in Vercel, then redeploy.";
+  if (lower.includes("not configured")) return "This deployment is missing its secure Supabase connection. Ask an administrator to add SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in Vercel, then redeploy.";
   if (lower.includes("failed to fetch") || lower.includes("network") || lower.includes("timeout")) return "We could not reach the secure sign-in service. Check your connection and try again.";
   if (lower.includes("invalid login") || lower.includes("invalid credentials")) return "The email address or password is incorrect. Please try again.";
   if (lower.includes("already registered")) return "An account already exists for this email. Switch to Sign in to continue.";
@@ -29,7 +29,7 @@ export default function LoginScreen() {
   const busy = submitting || retrying;
 
   useEffect(() => { if (connectionError) setMessage(userMessage(connectionError)); }, [connectionError]);
-  useEffect(() => { if (!isSupabaseConfigured) setMessage("This deployment is missing its secure Supabase connection. Ask an administrator to add the public Supabase settings in Vercel, then redeploy."); }, []);
+  useEffect(() => { if (!isSupabaseConfigured) setMessage("This deployment is missing its secure Supabase connection. Ask an administrator to add SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in Vercel, then redeploy."); }, []);
 
   const retryConnection = async () => { setRetrying(true); setMessage(null); try { await refresh(); } catch (error) { setMessage(userMessage(error)); } finally { setRetrying(false); } };
   const submit = async () => {

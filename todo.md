@@ -51,3 +51,4 @@
 - [x] Add course filtering and sorting controls to dashboard discovery.
 - [x] Improve sign-in loading states and Supabase connection error handling.
 - [x] Support the configured Vercel Supabase variable aliases during Expo web export.
+- [x] Fix deployed Expo web configuration so Vercel Supabase variables are available to the browser bundle.

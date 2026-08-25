@@ -38,6 +38,9 @@ const env = {
   androidPackage: bundleId,
 };
 
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() ?? "";
+const supabasePublishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ?? "";
+
 const config: ExpoConfig = {
   name: env.appName,
   slug: env.appSlug,
@@ -83,6 +86,12 @@ const config: ExpoConfig = {
     bundler: "metro",
     output: "static",
     favicon: "./assets/images/favicon.png",
+  },
+  // Expo serializes `extra` into the deployed bundle. These are intentionally
+  // public client values; Supabase Row Level Security remains the data boundary.
+  extra: {
+    supabaseUrl,
+    supabasePublishableKey,
   },
   plugins: [
     "expo-router",
