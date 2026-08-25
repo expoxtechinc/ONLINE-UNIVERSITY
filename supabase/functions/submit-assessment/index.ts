@@ -21,6 +21,11 @@ Deno.serve(async (request) => {
   const courseId = (lesson.course_modules as { course_id: string }).course_id;
   const { data: enrollment } = await admin.from("enrollments").select("id,status").eq("user_id", user.id).eq("course_id", courseId).in("status", ["active", "completed"]).maybeSingle();
   if (!enrollment) return Response.json({ error: "Active enrollment required" }, { status: 403, headers: corsHeaders });
+  const { count: recentAttempts } = await admin.from("assessment_attempts").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("lesson_id", lesson_id).gte("submitted_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+  if ((recentAttempts || 0) >= 5) {
+    await admin.from("audit_events").insert({ actor_id: user.id, action: "assessment.attempt_blocked", subject_type: "lesson", subject_id: lesson_id, metadata: { reason: "rolling_daily_attempt_limit" } });
+    return Response.json({ error: "Daily attempt limit reached. Please review the lesson and try again tomorrow." }, { status: 429, headers: corsHeaders });
+  }
   const assessment = (lesson.assessment || {}) as Assessment;
   const questions = assessment.questions || [];
   if (!questions.length) return Response.json({ error: "Assessment is not configured" }, { status: 422, headers: corsHeaders });
@@ -32,7 +37,8 @@ Deno.serve(async (request) => {
   });
   const score = Math.round((scoreParts.reduce((sum, value) => sum + value.earned, 0) / scoreParts.reduce((sum, value) => sum + value.available, 0)) * 10000) / 100;
   const passed = score >= (assessment.pass_score ?? 70);
-  await admin.from("assessment_attempts").insert({ user_id: user.id, lesson_id, score, passed, answers });
+  await admin.from("assessment_attempts").insert({ user_id: user.id, lesson_id, score, passed, answers, integrity_metadata: { grading: "server", submitted_via: "supabase_edge_function", question_count: questions.length } });
+  await admin.from("audit_events").insert({ actor_id: user.id, action: "assessment.submitted", subject_type: "lesson", subject_id: lesson_id, metadata: { score, passed, question_count: questions.length } });
   if (passed) await admin.from("lesson_completions").upsert({ user_id: user.id, lesson_id }, { onConflict: "user_id,lesson_id" });
   let certificate: { verification_code: string } | null = null;
   if (passed && lesson.kind === "final_exam") {

@@ -62,6 +62,18 @@
 - [x] Confirm whether nassboss231@gmail.com should be added to the super-admin allowlist before granting elevated access.
 - [x] Add user-approved nassboss231@gmail.com to the Supabase super-admin allowlist and validate the protected role outcome.
 - [x] Enhance super-admin user management with explicit role assignment and revocation controls.
-- [ ] Test Supabase connector capabilities and retrieve a non-sensitive data sample
-- [ ] Synchronize the latest Online University source to GitHub
-- [ ] Deploy the latest source to Vercel and verify the live URL
+- [x] Test Supabase connector capabilities and retrieve a non-sensitive data sample
+- [x] Synchronize the latest Online University source to GitHub
+- [x] Deploy the latest source to Vercel and verify the live URL
+- [ ] Test live Google sign-in and verify nassboss231@gmail.com receives protected super-admin access.
+- [x] Expand course authoring for modules, categories, articles, videos, images, flashcards, quizzes, tests, and exams with persistence.
+- [x] Add admin-wide deletion controls with authorization and audit protection.
+- [x] Replace the static dated learner greeting with useful live progress content.
+- [x] Add learner account editing with protected persistence.
+- [x] Add privacy-conscious assessment integrity controls and server-side audit signals.
+- [x] Run end-to-end upload, save, auth, and release validation and synchronize the result.
+- [x] Repair the Expo router type-generation error caused by removed .expo artifacts and rerun validation.
+
+- [x] Synchronize the latest validated source and prepare the user-controlled Vercel Publish release.
+
+- [ ] Push checkpoint 05f4048a to expoxtechinc/ONLINE-UNIVERSITY main for manual Vercel deployment.
