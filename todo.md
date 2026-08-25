@@ -62,3 +62,6 @@
 - [x] Confirm whether nassboss231@gmail.com should be added to the super-admin allowlist before granting elevated access.
 - [x] Add user-approved nassboss231@gmail.com to the Supabase super-admin allowlist and validate the protected role outcome.
 - [x] Enhance super-admin user management with explicit role assignment and revocation controls.
+- [ ] Test Supabase connector capabilities and retrieve a non-sensitive data sample
+- [ ] Synchronize the latest Online University source to GitHub
+- [ ] Deploy the latest source to Vercel and verify the live URL
