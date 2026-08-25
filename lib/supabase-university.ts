@@ -1,6 +1,6 @@
 import { Platform } from "react-native";
 
-import { supabase, type UniversityProfile } from "@/lib/supabase";
+import { requireSupabaseConfiguration, supabase, type UniversityProfile } from "@/lib/supabase";
 
 export type ManagedCourse = {
   id: string;
@@ -24,12 +24,14 @@ function slugify(value: string) {
 }
 
 export async function listManagedCourses() {
+  requireSupabaseConfiguration();
   const { data, error } = await supabase.from("courses").select("id,title,slug,description,category,level,duration_minutes,price_cents,currency,status,author_id,created_at").order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as ManagedCourse[];
 }
 
 export async function createManagedCourse(input: CourseDraft) {
+  requireSupabaseConfiguration();
   const { data: session } = await supabase.auth.getUser();
   if (!session.user) throw new Error("Sign in is required to create a course.");
   const baseSlug = slugify(input.title);
@@ -40,12 +42,14 @@ export async function createManagedCourse(input: CourseDraft) {
 }
 
 export async function setCourseStatus(courseId: string, status: ManagedCourse["status"]) {
+  requireSupabaseConfiguration();
   const values = status === "published" ? { status, published_at: new Date().toISOString() } : { status };
   const { error } = await supabase.from("courses").update(values).eq("id", courseId);
   if (error) throw error;
 }
 
 export async function uploadCourseMedia(courseId: string, asset: { uri: string; name: string; mimeType?: string | null; file?: File }) {
+  requireSupabaseConfiguration();
   const body = Platform.OS === "web" && asset.file ? asset.file : await fetch(asset.uri).then((response) => response.arrayBuffer());
   const safeName = asset.name.replace(/[^a-zA-Z0-9._-]/g, "_");
   const path = `${courseId}/${Date.now()}-${safeName}`;
@@ -55,12 +59,14 @@ export async function uploadCourseMedia(courseId: string, asset: { uri: string; 
 }
 
 export async function listUniversityProfiles() {
+  requireSupabaseConfiguration();
   const { data, error } = await supabase.from("profiles").select("id,email,display_name,legal_name,country_code,role").order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as UniversityProfile[];
 }
 
 export async function setUniversityRole(profileId: string, role: UniversityProfile["role"]) {
+  requireSupabaseConfiguration();
   const { error } = await supabase.from("profiles").update({ role }).eq("id", profileId);
   if (error) throw error;
 }

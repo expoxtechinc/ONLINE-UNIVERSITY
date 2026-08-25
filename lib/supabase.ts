@@ -3,8 +3,24 @@ import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import { createClient } from "@supabase/supabase-js";
 
-const url = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
-const publishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "";
+const configuredUrl = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() ?? "";
+const configuredPublishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ?? "";
+
+/**
+ * A static Vercel export evaluates modules before browser runtime variables are
+ * available. These valid placeholder values keep prerendering deterministic;
+ * app operations are explicitly blocked below unless both real public values
+ * were supplied at build time.
+ */
+export const isSupabaseConfigured = Boolean(configuredUrl && configuredPublishableKey);
+const url = configuredUrl || "https://build-placeholder.supabase.co";
+const publishableKey = configuredPublishableKey || "build-time-placeholder";
+
+export function requireSupabaseConfiguration() {
+  if (!isSupabaseConfigured) {
+    throw new Error("Online University is not configured for this deployment. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY in Vercel, then redeploy.");
+  }
+}
 
 const mobileSecureStorage = {
   getItem: (key: string) => SecureStore.getItemAsync(key, { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY }),
